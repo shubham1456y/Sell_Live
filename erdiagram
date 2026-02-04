@@ -1,0 +1,82 @@
+You are an expert Database Architect. Your task is to generate a comprehensive Entity Relationship Diagram (ERD) code for **Eraser.io** based on the following project specifications for a "Live Stream Shopping Application".
+
+Please carefully analyze the Requirements and generate the Eraser.io code (DSL) that defines all Tables, Columns, Primary Keys (PK), Foreign Keys (FK), and Relationships.
+
+### **Project Overview**
+The application is a mobile-first live streaming e-commerce platform where users can browse products, watch live selling streams, chat, and purchase items instantly. Users can also apply to become sellers.
+
+### **Core Modules & Entities**
+
+#### **1. Identity & Profiles**
+*   **Users Table**: Stores authentication, core profile info, and roles.
+    *   Columns: `id` (PK), `email` (Unique), `password_hash`, `full_name`, `role` (Enum: 'user', 'admin'), `created_at`, `updated_at`, `is_active`.
+*   **Profiles Table**: Stores additional user details (1:1 with Users).
+    *   Columns: `id` (PK), `user_id` (FK -> users.id), `bio`, `avatar_url`, `preferences` (JSONB - e.g., sizes, interests).
+*   **Addresses Table**: Shipping addresses for users.
+    *   Columns: `id` (PK), `user_id` (FK -> users.id), `full_name`, `address_line1`, `address_line2`, `city`, `state`, `postal_code`, `country`, `is_default` (Boolean).
+*   **Notifications Table**: User activity feed.
+    *   Columns: `id` (PK), `user_id` (FK -> users.id), `type` (Enum: 'order', 'stream', 'follow', 'system'), `title`, `message`, `data` (JSONB - deep link info), `is_read` (Boolean), `created_at`.
+
+#### **2. Store & Sellers**
+*   **Sellers Table**: Users who have upgraded to sell products.
+    *   Relationships: 1:1 with Users.
+    *   Columns: `id` (PK), `user_id` (FK -> users.id), `store_name` (Unique), `description`, `logo_url`, `verification_status` (Enum: 'pending', 'approved', 'rejected'), `application_data` (JSONB), `platforms_sold_on` (JSONB), `return_address` (JSONB), `balance` (Decimal - current earnings to be paid), `created_at`.
+*   **Follows Table**: Users following Sellers.
+    *   Columns: `id` (PK), `follower_id` (FK -> users.id), `following_id` (FK -> sellers.id), `created_at`.
+*   **Banned_Viewers Table**: Moderation for sellers banning users from their streams.
+    *   Columns: `id` (PK), `seller_id` (FK -> sellers.id), `user_id` (FK -> users.id), `reason`, `created_at`.
+*   **Seller_Payouts Table**: Records of earnings paid out to sellers.
+    *   Columns: `id` (PK), `seller_id` (FK -> sellers.id), `amount` (Decimal), `status` (Enum: 'pending', 'processing', 'paid', 'failed'), `payout_period_start` (Timestamp), `payout_period_end` (Timestamp), `payout_date` (Timestamp), `transaction_reference` (Text - e.g. Stipe Payout ID), `created_at`.
+
+#### **3. Catalog & Inventory**
+*   **Categories Table**: Product taxonomy.
+    *   Columns: `id` (PK), `name`, `parent_id` (FK -> categories.id), `image_url`, `level` (Int).
+*   **Shipping_Profiles Table**: Defined shipping rules by sellers.
+    *   Columns: `id` (PK), `seller_id` (FK -> sellers.id), `name`, `delivery_days_min`, `delivery_days_max`, `price`.
+*   **Products Table**: Items for sale (Parent Entity).
+    *   Columns: `id` (PK), `seller_id` (FK -> sellers.id), `category_id` (FK -> categories.id), `title`, `description` (Text), `base_price` (Decimal - for display), `shipping_profile_id` (FK -> shipping_profiles.id), `status` (Enum: 'draft', 'active', 'sold_out', 'archived'), `images` (JSONB), `created_at`.
+*   **Product_Variants Table**: Specific SKU variations (Size/Color).
+    *   Columns: `id` (PK), `product_id` (FK -> products.id), `sku` (String, Unique per seller), `title` (e.g. "Small / Red"), `options` (JSONB - e.g. `{"size": "S", "color": "Red"}`), `price` (Decimal - specific price for this variant), `quantity` (Int - Stock Level), `is_active` (Boolean).
+*   **Product_Reviews Table**: Feedback on items.
+    *   Columns: `id` (PK), `product_id` (FK -> products.id), `user_id` (FK -> users.id), `rating` (1-5), `comment` (Text), `created_at`.
+
+#### **4. Live Streaming**
+*   **Streams Table**: Live broadcast sessions.
+    *   Columns: `id` (PK), `seller_id` (FK -> sellers.id), `title`, `status` (Enum: 'scheduled', 'live', 'ended'), `scheduled_at`, `started_at`, `ended_at`, `active_product_id` (FK -> products.id), `viewer_count_peak` (Int).
+*   **Stream_Chat_Messages Table** (High Volume):
+    *   Columns: `id` (PK), `stream_id` (FK -> streams.id), `user_id` (FK -> users.id), `message`, `sent_at`.
+*   **Stream_Reactions Table**: For "Heart" animations and analytics.
+    *   Columns: `id` (PK), `stream_id` (FK -> streams.id), `user_id` (FK -> users.id), `type` (Enum: 'heart', 'like'), `created_at`.
+
+#### **5. Orders & Financials**
+*   **Cart_Items Table**: Pre-order temporary storage.
+    *   Columns: `id` (PK), `user_id` (FK -> users.id), `product_variant_id` (FK -> product_variants.id), `quantity`.
+*   **Orders Table**: Purchase records.
+    *   Columns: `id` (PK), `user_id` (FK -> users.id), `seller_id` (FK -> sellers.id), `total_amount`, `shipping_amount`, `tax_amount`, `status` (Enum: 'pending', 'confirmed', 'shipped', 'delivered', 'cancelled', 'refunded'), `shipping_address_snapshot` (JSONB), `tracking_number`, `created_at`.
+*   **Order_Items Table**: Line items in an order.
+    *   Columns: `id` (PK), `order_id` (FK -> orders.id), `product_id` (FK -> products.id), `product_variant_id` (FK -> product_variants.id, nullable), `quantity`, `price_at_purchase`, `product_snapshot` (JSONB - includes title, variant info, image).
+*   **Payments Table**: Transaction records.
+    *   Columns: `id` (PK), `order_id` (FK -> orders.id), `payment_provider` (Enum: 'stripe', 'paypal'), `transaction_id`, `amount`, `currency`, `status` (Enum: 'succeeded', 'failed', 'refunded'), `created_at`.
+*   **Refunds Table**: Refund records.
+    *   Columns: `id` (PK), `order_id` (FK -> orders.id), `payment_id` (FK -> payments.id), `amount` (Decimal), `reason` (Text), `status` (Enum: 'pending', 'succeeded', 'failed'), `created_at`.
+
+### **Instructions for Output**
+
+1.  **Format**: Use the standard Eraser.io DSL format.
+2.  **Groups**: Group tables logically (e.g., `Identity`, `Catalog`, `Orders`, `Live`, `Financials`).
+3.  **Relationships**: Explicitly define relationships using standard notations:
+    *   `<>` (One-to-Many)
+    *   `-` (One-to-One)
+4.  **Data Types**: Include precise data types.
+5.  **Keys**: Mark all PKs and FKs clearly.
+
+**Example Output Start:**
+```eraser
+// Identity Group
+Table users {
+  id uuid [pk]
+  email varchar [unique, not null]
+  ...
+}
+...
+```
